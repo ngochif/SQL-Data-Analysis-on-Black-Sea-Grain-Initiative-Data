@@ -1,0 +1,65 @@
+--Rank Ukrainian ports by number of shipments made from each port
+SELECT Departure_port, 
+	COUNT(Distinct Outbound_Sequence) AS NumberOfShipments, 
+	RANK() OVER (ORDER BY COUNT(Distinct Outbound_Sequence) DESC) ShipmentRank 
+	FROM [Black Sea Grain Initiative] 
+	GROUP BY Departure_port 
+	ORDER BY NumberOfShipments DESC
+
+--Indicate whether a ship stopped for inspection in Istanbul or not
+SELECT Vessel_name, 
+	CASE 
+		WHEN Inspection_İstanbul IS NULL THEN 'Not Inspected' 
+		ELSE 'Inspected' END AS InspectionStatus 
+	FROM [Black Sea Grain Initiative]
+
+--Number of ships that missed inspection in Istanbul by flag country--
+SELECT Flag, 
+	(SELECT 
+	COUNT(DISTINCT Outbound_Sequence) 
+	FROM [Black Sea Grain Initiative] 
+	WHERE Inspection_İstanbul IS NULL ) 
+	AS MissedInspection
+FROM [Black Sea Grain Initiative] 
+GROUP BY Flag 
+ORDER BY MissedInspection DESC;
+
+--Days between departure of ship from Ukraine port and its inspection in Istanbul
+Select Flag, 
+	SUM(DATEDIFF(day, Departure, Inspection_İstanbul)) AS TimetoInspection 
+	FROM [Black Sea Grain Initiative] 
+	WHERE Inspection_İstanbul IS NOT NULL 
+	GROUP BY Flag 
+	ORDER BY TimetoInspection ;
+
+--Find all ships that sailed  from either the port of Odessa or Chornomorsk in May 2023
+Select Vessel_name, 
+		Departure_port,
+		Departure AS DepartureDate 
+		FROM [Black Sea Grain Initiative] 
+		WHERE Departure_port IN ('Odesa', 'Chornomorsk') 
+		AND Departure LIKE '2023-05%';
+
+--Monthly Volume shipped--
+Select  DISTINCT YEAR (Departure) AS ShippedYear, MONTH(Departure) AS ShippedMonth, 
+		SUM(Tonnage) AS VolumeShipped FROM [Black Sea Grain Initiative] 
+		Group By Year(Departure), MONTH(Departure) 
+		Order BY ShippedYear, ShippedMonth ASC;
+		
+
+--Find the year-to-date quantity of grains shipped to each country
+SELECT Country, SUM (CASE WHEN 
+        Departure>=DATEADD(year, datediff(year,0,getDate())-1, 0)  AND 
+        Departure<DATEADD(year, datediff(year,0,getDate()), 0) 
+        THEN Tonnage ELSE 0 END) 
+        AS YTD_Total
+		FROM [Black Sea Grain Initiative] 
+		Group by Country
+
+--Find the proportion of wheat in all the grains shipped to each country--
+SELECT Country,
+       SUM(Tonnage)/
+	    (Select SUM(Tonnage) FROM [Black Sea Grain Initiative] WHERE Commodity = 'Wheat')*100 as PercentageWheat
+	   FROM [Black Sea Grain Initiative] 
+	   WHERE Commodity='Wheat'
+	   Group by Country;
